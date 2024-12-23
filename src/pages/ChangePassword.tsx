@@ -22,10 +22,13 @@ export default function ChangePassword() {
 
         console.log("Checking password status for user:", session.user.email);
         
+        // Extract member number from email if it's a temporary email
+        const memberNumber = session.user.email?.split('@')[0]?.toUpperCase();
+        
         const { data: member, error } = await supabase
           .from('members')
-          .select('password_changed')
-          .eq('email', session.user.email)
+          .select('password_changed, member_number')
+          .or(`email.eq.${session.user.email},member_number.eq.${memberNumber}`)
           .maybeSingle();
 
         if (error) {
@@ -42,7 +45,7 @@ export default function ChangePassword() {
           });
           navigate("/admin/profile");
         } else if (!member) {
-          console.log("No member record found for email:", session.user.email);
+          console.log("No member record found for email:", session.user.email, "or member number:", memberNumber);
           toast({
             title: "Profile not found",
             description: "Unable to find your profile. Please contact support.",
