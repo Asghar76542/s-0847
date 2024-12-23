@@ -26,7 +26,7 @@ export default function ChangePassword() {
           .from('members')
           .select('password_changed')
           .eq('email', session.user.email)
-          .single();
+          .maybeSingle();
 
         if (error) {
           console.error("Error checking password status:", error);
@@ -41,6 +41,14 @@ export default function ChangePassword() {
             description: "You have already changed your password. Redirecting to profile.",
           });
           navigate("/admin/profile");
+        } else if (!member) {
+          console.log("No member record found for email:", session.user.email);
+          toast({
+            title: "Profile not found",
+            description: "Unable to find your profile. Please contact support.",
+            variant: "destructive",
+          });
+          navigate("/login");
         }
       } catch (error) {
         console.error("Error in checkPasswordStatus:", error);
