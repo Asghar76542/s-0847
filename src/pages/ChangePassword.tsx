@@ -39,10 +39,6 @@ export default function ChangePassword() {
         console.log("Password status:", member?.password_changed);
 
         if (member?.password_changed) {
-          toast({
-            title: "Password already changed",
-            description: "You have already changed your password. Redirecting to profile.",
-          });
           navigate("/admin/profile");
         } else if (!member) {
           console.log("No member record found for email:", session.user.email, "or member number:", memberNumber);
