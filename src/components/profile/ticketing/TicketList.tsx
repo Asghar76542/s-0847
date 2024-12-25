@@ -1,6 +1,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TicketResponseDialog } from "../TicketResponseDialog";
-import { Ticket } from "../types/ticket";
+import { Ticket, Response } from "../types";
+import { TicketResponse } from "../types/ticket";
 
 interface TicketListProps {
   tickets: Ticket[];
@@ -10,6 +11,15 @@ interface TicketListProps {
 }
 
 export function TicketList({ tickets, response, setResponse, handleAddResponse }: TicketListProps) {
+  const mapTicketResponses = (responses: TicketResponse[]): Response[] => {
+    return responses.map(resp => ({
+      id: resp.id,
+      message: resp.response,
+      date: resp.created_at,
+      isAdmin: !!resp.responder?.email
+    }));
+  };
+
   return (
     <div className="rounded-md border">
       <Table>
@@ -53,6 +63,7 @@ export function TicketList({ tickets, response, setResponse, handleAddResponse }
                     ...ticket,
                     message: ticket.description,
                     date: ticket.created_at,
+                    responses: mapTicketResponses(ticket.responses)
                   }}
                   response={response}
                   setResponse={setResponse}
