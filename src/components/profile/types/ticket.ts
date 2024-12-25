@@ -21,4 +21,6 @@ export interface Ticket {
   updated_at: string;
   member_id: string | null;
   responses: TicketResponse[];
+  message?: string;
+  date?: string;
 }
