@@ -15,8 +15,8 @@ export interface Ticket {
   id: string;
   subject: string;
   description: string;
-  status: string | null;
-  priority: string | null;
+  status: "open" | "closed" | "in_progress" | "resolved";
+  priority: "high" | "medium" | "low" | null;
   created_at: string;
   updated_at: string;
   member_id: string | null;
