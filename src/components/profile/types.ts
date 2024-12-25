@@ -13,4 +13,6 @@ export interface Ticket {
   status: "open" | "closed" | "in_progress" | "resolved";
   date: string;
   responses: Response[];
+  description?: string;
+  created_at?: string;
 }

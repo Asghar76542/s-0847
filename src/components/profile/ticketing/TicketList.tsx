@@ -55,15 +55,15 @@ export function TicketList({ tickets, response, setResponse, handleAddResponse }
                 </span>
               </TableCell>
               <TableCell>
-                {new Date(ticket.created_at).toLocaleDateString()}
+                {new Date(ticket.date).toLocaleDateString()}
               </TableCell>
               <TableCell>
                 <TicketResponseDialog
                   ticket={{
                     ...ticket,
-                    message: ticket.description,
-                    date: ticket.created_at,
-                    responses: mapTicketResponses(ticket.responses)
+                    message: ticket.description || "",
+                    date: ticket.created_at || new Date().toISOString(),
+                    responses: mapTicketResponses(ticket.responses || [])
                   }}
                   response={response}
                   setResponse={setResponse}

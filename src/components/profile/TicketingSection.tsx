@@ -47,7 +47,7 @@ export function TicketingSection() {
       .insert({
         subject: newTicket.subject,
         description: newTicket.message,
-        member_id: member.id,
+        member_id: member?.id,
         status: "open",
       });
 
