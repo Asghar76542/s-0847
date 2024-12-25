@@ -11,15 +11,64 @@ import {
 import { CreateTicketDialog } from "./CreateTicketDialog";
 import { TicketResponseDialog } from "./TicketResponseDialog";
 import { Ticket } from "./types";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 export function TicketingSection() {
   const { toast } = useToast();
-  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [newTicket, setNewTicket] = useState({ subject: "", message: "" });
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [response, setResponse] = useState("");
 
-  const handleCreateTicket = () => {
+  const { data: tickets = [], refetch: refetchTickets } = useQuery({
+    queryKey: ['support-tickets'],
+    queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return [];
+
+      const memberNumber = session.user.user_metadata?.member_number;
+      
+      if (!memberNumber) {
+        console.log('No member number found in session');
+        return [];
+      }
+
+      const { data: member, error: memberError } = await supabase
+        .from('members')
+        .select('id')
+        .eq('member_number', memberNumber)
+        .single();
+
+      if (memberError) {
+        console.error('Error fetching member:', memberError);
+        return [];
+      }
+
+      const { data: tickets, error } = await supabase
+        .from('support_tickets')
+        .select(`
+          *,
+          responses:ticket_responses (
+            *,
+            responder:profiles (
+              full_name,
+              email
+            )
+          )
+        `)
+        .eq('member_id', member.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching tickets:', error);
+        return [];
+      }
+
+      return tickets;
+    }
+  });
+
+  const handleCreateTicket = async () => {
     if (!newTicket.subject || !newTicket.message) {
       toast({
         title: "Error",
@@ -29,44 +78,78 @@ export function TicketingSection() {
       return;
     }
 
-    const ticket: Ticket = {
-      id: `TICKET-${Math.random().toString(36).substr(2, 9)}`,
-      subject: newTicket.subject,
-      message: newTicket.message,
-      status: "open",
-      date: new Date().toISOString(),
-      responses: [],
-    };
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
 
-    setTickets([ticket, ...tickets]);
+    const memberNumber = session.user.user_metadata?.member_number;
+    
+    if (!memberNumber) {
+      console.log('No member number found in session');
+      return;
+    }
+
+    const { data: member, error: memberError } = await supabase
+      .from('members')
+      .select('id')
+      .eq('member_number', memberNumber)
+      .single();
+
+    if (memberError) {
+      console.error('Error fetching member:', memberError);
+      return;
+    }
+
+    const { error } = await supabase
+      .from('support_tickets')
+      .insert({
+        subject: newTicket.subject,
+        description: newTicket.message,
+        member_id: member.id,
+        status: "open",
+      });
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create ticket",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setNewTicket({ subject: "", message: "" });
+    refetchTickets();
     toast({
       title: "Success",
       description: "Ticket created successfully",
     });
   };
 
-  const handleAddResponse = () => {
+  const handleAddResponse = async () => {
     if (!response || !selectedTicket) return;
 
-    const newResponse = {
-      id: Math.random().toString(36).substr(2, 9),
-      message: response,
-      date: new Date().toISOString(),
-      isAdmin: false,
-    };
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
 
-    const updatedTickets = tickets.map((ticket) =>
-      ticket.id === selectedTicket.id
-        ? {
-            ...ticket,
-            responses: [...ticket.responses, newResponse],
-          }
-        : ticket
-    );
+    const { error } = await supabase
+      .from('ticket_responses')
+      .insert({
+        response,
+        ticket_id: selectedTicket.id,
+        responder_id: session.user.id
+      });
 
-    setTickets(updatedTickets);
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add response",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setResponse("");
+    refetchTickets();
     toast({
       title: "Success",
       description: "Response added successfully",
