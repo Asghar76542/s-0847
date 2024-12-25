@@ -40,7 +40,8 @@ export const PasswordChangeForm = () => {
         throw new Error("No active session found. Please log in again.");
       }
 
-      console.log("Updating password for user:", session.user.email);
+      const memberNumber = session.user.user_metadata.member_number;
+      console.log("Updating password for member:", memberNumber);
 
       // Update the password
       const { error: updateError } = await supabase.auth.updateUser({
@@ -49,7 +50,7 @@ export const PasswordChangeForm = () => {
 
       if (updateError) throw updateError;
 
-      // Update the member record
+      // Update the member record using member_number
       const { error: memberUpdateError } = await supabase
         .from('members')
         .update({ 
@@ -57,7 +58,7 @@ export const PasswordChangeForm = () => {
           phone: phoneNumber,
           profile_updated: true
         })
-        .eq('auth_user_id', session.user.id);
+        .eq('member_number', memberNumber);
 
       if (memberUpdateError) {
         console.error("Error updating member status:", memberUpdateError);
