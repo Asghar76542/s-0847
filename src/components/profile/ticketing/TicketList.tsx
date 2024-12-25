@@ -36,6 +36,8 @@ export function TicketList({ tickets, response, setResponse, handleAddResponse }
                       ? "bg-yellow-100 text-yellow-800"
                       : ticket.status === "resolved"
                       ? "bg-blue-100 text-blue-800"
+                      : ticket.status === "closed"
+                      ? "bg-gray-100 text-gray-800"
                       : "bg-gray-100 text-gray-800"
                   }`}
                 >
