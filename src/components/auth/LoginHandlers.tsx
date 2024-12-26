@@ -10,21 +10,26 @@ export const useLoginHandlers = (setIsLoggedIn: (value: boolean) => void) => {
     try {
       console.log("Looking up member:", memberId);
       
-      // First, get the member details
-      const { data: member, error: memberError } = await supabase
+      // First, get the member details with detailed logging
+      const { data: members, error: memberError } = await supabase
         .from('members')
         .select('id, email, default_password_hash, password_changed, auth_user_id')
-        .eq('member_number', memberId)
-        .maybeSingle();
+        .eq('member_number', memberId);
+
+      console.log("Member lookup response:", { members, memberError });
 
       if (memberError) {
         console.error('Member lookup error:', memberError);
         throw new Error("Error checking member status. Please try again later.");
       }
 
-      if (!member) {
+      if (!members || members.length === 0) {
+        console.error('No member found with ID:', memberId);
         throw new Error("Invalid Member ID. Please check your credentials and try again.");
       }
+
+      const member = members[0];
+      console.log("Found member:", { memberId: member.id, hasAuthId: !!member.auth_user_id });
 
       // Attempt to sign in with the temp email
       const tempEmail = `${memberId.toLowerCase()}@temp.pwaburton.org`;
@@ -43,8 +48,11 @@ export const useLoginHandlers = (setIsLoggedIn: (value: boolean) => void) => {
         throw signInError;
       }
 
+      console.log("Sign in successful:", { userId: data.user?.id });
+
       // Update auth_user_id if not set
       if (!member.auth_user_id && data.user) {
+        console.log("Updating member with auth user ID:", data.user.id);
         const { error: updateError } = await supabase
           .from('members')
           .update({ 
@@ -61,6 +69,7 @@ export const useLoginHandlers = (setIsLoggedIn: (value: boolean) => void) => {
 
       // Check if password needs to be changed
       if (!member.password_changed) {
+        console.log("Password change required, redirecting...");
         navigate("/change-password");
         return;
       }
