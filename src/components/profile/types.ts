@@ -3,11 +3,11 @@ export interface Response {
   message: string;
   date: string;
   isAdmin: boolean;
-  response?: string;
-  created_at?: string;
-  updated_at?: string;
-  responder_id?: string;
-  ticket_id?: string;
+  response: string;  // Making this required to match TicketResponse
+  created_at: string;
+  updated_at: string;
+  responder_id: string;
+  ticket_id: string;
 }
 
 export interface Ticket {
