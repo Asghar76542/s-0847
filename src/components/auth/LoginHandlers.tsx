@@ -15,7 +15,7 @@ export const useLoginHandlers = (setIsLoggedIn: (value: boolean) => void) => {
         .from('members')
         .select('id, email, default_password_hash, password_changed, auth_user_id')
         .ilike('member_number', memberId)
-        .limit(1);
+        .single();
 
       console.log("Member lookup response:", { members, memberError });
 
@@ -24,56 +24,51 @@ export const useLoginHandlers = (setIsLoggedIn: (value: boolean) => void) => {
         throw new Error("Error checking member status. Please try again later.");
       }
 
-      if (!members || members.length === 0) {
+      if (!members) {
         console.error('No member found with ID:', memberId);
         throw new Error("Invalid Member ID. Please check your credentials and try again.");
       }
 
-      const member = members[0];
+      const member = members;
       console.log("Found member:", { memberId: member.id, hasAuthId: !!member.auth_user_id });
 
       // Attempt to sign in with the temp email
       const tempEmail = `${memberId.toLowerCase()}@temp.pwaburton.org`;
       console.log("Attempting login with:", tempEmail);
       
+      let authResponse;
+      
       try {
         // First try to sign in
-        let authResponse = await supabase.auth.signInWithPassword({
+        authResponse = await supabase.auth.signInWithPassword({
           email: tempEmail,
           password: password,
         });
 
-        // If sign in fails, try to sign up
         if (authResponse.error) {
           console.log("Sign in failed, attempting signup:", authResponse.error);
           
+          // If sign in fails, try to sign up
           authResponse = await supabase.auth.signUp({
             email: tempEmail,
             password: password,
           });
-
-          if (authResponse.error) {
-            console.error("Both sign in and sign up failed:", authResponse.error);
-            throw new Error("Authentication failed. Please try again.");
-          }
         }
 
-        const { data, error: finalError } = authResponse;
-        
-        if (finalError) {
-          console.error('Final auth error:', finalError);
-          throw finalError;
+        if (authResponse.error) {
+          console.error("Authentication failed:", authResponse.error);
+          throw new Error("Authentication failed. Please check your credentials.");
         }
 
-        console.log("Authentication successful:", { userId: data.user?.id });
+        console.log("Authentication successful:", { userId: authResponse.data.user?.id });
 
         // Update auth_user_id if not set
-        if (!member.auth_user_id && data.user) {
-          console.log("Updating member with auth user ID:", data.user.id);
+        if (!member.auth_user_id && authResponse.data.user) {
+          console.log("Updating member with auth user ID:", authResponse.data.user.id);
           const { error: updateError } = await supabase
             .from('members')
             .update({ 
-              auth_user_id: data.user.id,
+              auth_user_id: authResponse.data.user.id,
               email_verified: true,
               profile_updated: true
             })
