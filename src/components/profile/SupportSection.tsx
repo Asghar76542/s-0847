@@ -19,6 +19,8 @@ export const SupportSection = () => {
         return null;
       }
 
+      console.log('Fetching collector info for member:', memberNumber);
+      
       const { data: member, error: memberError } = await supabase
         .from('members')
         .select(`
@@ -29,14 +31,20 @@ export const SupportSection = () => {
           )
         `)
         .eq('member_number', memberNumber)
-        .single();
+        .maybeSingle();
 
       if (memberError) {
         console.error('Error fetching collector info:', memberError);
         return null;
       }
 
-      return member?.collector;
+      if (!member) {
+        console.log('No member found with member number:', memberNumber);
+        return null;
+      }
+
+      console.log('Found collector info:', member.collector);
+      return member.collector;
     }
   });
 
