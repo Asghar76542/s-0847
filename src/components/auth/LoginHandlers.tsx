@@ -15,7 +15,7 @@ export const useLoginHandlers = (setIsLoggedIn: (value: boolean) => void) => {
         .from('members')
         .select('id, email, default_password_hash, password_changed, auth_user_id')
         .ilike('member_number', memberId)
-        .limit(1); // Add limit to ensure we only get one result
+        .limit(1);
 
       console.log("Member lookup response:", { members, memberError });
 
@@ -37,17 +37,35 @@ export const useLoginHandlers = (setIsLoggedIn: (value: boolean) => void) => {
       console.log("Attempting login with:", tempEmail);
       
       try {
-        const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        // First try to sign in
+        let authResponse = await supabase.auth.signInWithPassword({
           email: tempEmail,
           password: password,
         });
 
-        if (signInError) {
-          console.error('Sign in error:', signInError);
-          throw signInError;
+        // If sign in fails, try to sign up
+        if (authResponse.error) {
+          console.log("Sign in failed, attempting signup:", authResponse.error);
+          
+          authResponse = await supabase.auth.signUp({
+            email: tempEmail,
+            password: password,
+          });
+
+          if (authResponse.error) {
+            console.error("Both sign in and sign up failed:", authResponse.error);
+            throw new Error("Authentication failed. Please try again.");
+          }
         }
 
-        console.log("Sign in successful:", { userId: data.user?.id });
+        const { data, error: finalError } = authResponse;
+        
+        if (finalError) {
+          console.error('Final auth error:', finalError);
+          throw finalError;
+        }
+
+        console.log("Authentication successful:", { userId: data.user?.id });
 
         // Update auth_user_id if not set
         if (!member.auth_user_id && data.user) {
@@ -80,9 +98,9 @@ export const useLoginHandlers = (setIsLoggedIn: (value: boolean) => void) => {
         
         setIsLoggedIn(true);
         navigate("/admin/profile");
-      } catch (signInError) {
-        console.error('Sign in attempt failed:', signInError);
-        throw new Error("Invalid Member ID or password. Please try again.");
+      } catch (authError: any) {
+        console.error('Authentication error:', authError);
+        throw new Error(authError.message || "Authentication failed. Please try again.");
       }
     } catch (error) {
       console.error("Member ID login error:", error);
