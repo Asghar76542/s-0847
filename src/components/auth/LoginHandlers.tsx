@@ -14,7 +14,7 @@ export const useLoginHandlers = (setIsLoggedIn: (value: boolean) => void) => {
       const { data: members, error: memberError } = await supabase
         .from('members')
         .select('id, email, default_password_hash, password_changed, auth_user_id')
-        .eq('member_number', memberId);
+        .ilike('member_number', memberId); // Changed from eq to ilike for case-insensitive comparison
 
       console.log("Member lookup response:", { members, memberError });
 
