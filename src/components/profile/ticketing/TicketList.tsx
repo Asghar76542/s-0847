@@ -16,7 +16,12 @@ export function TicketList({ tickets, response, setResponse, handleAddResponse }
       id: resp.id,
       message: resp.response,
       date: resp.created_at,
-      isAdmin: !!resp.responder?.email
+      isAdmin: !!resp.responder?.email,
+      response: resp.response,
+      created_at: resp.created_at,
+      updated_at: resp.updated_at,
+      responder_id: resp.responder_id,
+      ticket_id: resp.ticket_id
     }));
   };
 

@@ -108,7 +108,7 @@ export function TicketingSection() {
         handleCreateTicket={handleCreateTicket}
       />
       <TicketList
-        tickets={tickets as Ticket[]}
+        tickets={tickets as unknown as Ticket[]}
         response={response}
         setResponse={setResponse}
         handleAddResponse={handleAddResponse}
