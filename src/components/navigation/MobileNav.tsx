@@ -1,26 +1,16 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Menu, X, Link2Icon, InfoIcon, Stethoscope, LogIn, LogOut, User } from "lucide-react";
+import { Menu, X, Link2Icon, InfoIcon, Stethoscope } from "lucide-react";
 import { Button } from "../ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "../ui/sheet";
 
-interface MobileNavProps {
-  isLoggedIn: boolean;
-  handleLogout: () => Promise<void>;
-}
-
-export const MobileNav = ({ isLoggedIn, handleLogout }: MobileNavProps) => {
+export const MobileNav = () => {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
   const handleNavigation = (path: string) => {
     setOpen(false);
     navigate(path);
-  };
-
-  const handleLogoutClick = async () => {
-    await handleLogout();
-    setOpen(false);
   };
 
   return (
@@ -68,50 +58,8 @@ export const MobileNav = ({ isLoggedIn, handleLogout }: MobileNavProps) => {
               Medical Process
             </Button>
           </div>
-
-          <div className="pt-4 border-t space-y-3">
-            {isLoggedIn ? (
-              <>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start gap-2"
-                  onClick={() => handleNavigation("/admin")}
-                >
-                  <User className="h-4 w-4" />
-                  Admin Panel
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start gap-2"
-                  onClick={handleLogoutClick}
-                >
-                  <LogOut className="h-4 w-4" />
-                  Logout
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start gap-2"
-                  onClick={() => handleNavigation("/login")}
-                >
-                  <LogIn className="h-4 w-4" />
-                  Login
-                </Button>
-                <Button
-                  variant="default"
-                  className="w-full justify-start gap-2"
-                  onClick={() => handleNavigation("/register")}
-                >
-                  <User className="h-4 w-4" />
-                  Register
-                </Button>
-              </>
-            )}
-          </div>
         </div>
       </SheetContent>
     </Sheet>
   );
-};
+}

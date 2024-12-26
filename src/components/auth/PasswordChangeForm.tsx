@@ -40,45 +40,50 @@ export const PasswordChangeForm = () => {
         throw new Error("No active session found. Please log in again.");
       }
 
-      const memberNumber = session.user.user_metadata.member_number;
-      console.log("Updating password for member:", memberNumber);
-
       // Update the password
-      const { error: updateError } = await supabase.auth.updateUser({
+      const { data: userData, error: updateError } = await supabase.auth.updateUser({
         password: newPassword
       });
 
       if (updateError) throw updateError;
 
-      // Update the member record using member_number
-      const { error: memberUpdateError } = await supabase
+      // Update the member record
+      const { data: memberData, error: memberError } = await supabase
         .from('members')
-        .update({ 
-          password_changed: true,
-          phone: phoneNumber,
-          profile_updated: true
-        })
-        .eq('member_number', memberNumber);
+        .select('id')
+        .eq('email', session.user.email)
+        .maybeSingle();
 
-      if (memberUpdateError) {
-        console.error("Error updating member status:", memberUpdateError);
-        throw memberUpdateError;
+      if (memberError) throw memberError;
+
+      if (memberData) {
+        const { error: updateMemberError } = await supabase
+          .from('members')
+          .update({ 
+            auth_user_id: session.user.id,
+            password_changed: true,
+            first_time_login: false,
+            phone: phoneNumber,
+            profile_updated: true,
+            email_verified: true
+          })
+          .eq('id', memberData.id);
+
+        if (updateMemberError) throw updateMemberError;
       }
 
-      console.log("Successfully updated password and member status");
-
       toast({
-        title: "Password updated",
-        description: "Your password has been changed successfully",
+        title: "Profile updated",
+        description: "Your password and contact details have been updated successfully",
       });
       
-      // Redirect to profile after password change
+      // Redirect to admin/profile after password change
       navigate("/admin/profile");
     } catch (error) {
-      console.error("Password update error:", error);
+      console.error("Profile update error:", error);
       toast({
         title: "Update failed",
-        description: error instanceof Error ? error.message : "Failed to update password",
+        description: error instanceof Error ? error.message : "Failed to update profile",
         variant: "destructive",
       });
     } finally {
@@ -120,7 +125,7 @@ export const PasswordChangeForm = () => {
         />
       </div>
       <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading ? "Updating Password..." : "Update Password"}
+        {isLoading ? "Updating Profile..." : "Update Profile"}
       </Button>
     </form>
   );
