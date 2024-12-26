@@ -14,7 +14,8 @@ export const useLoginHandlers = (setIsLoggedIn: (value: boolean) => void) => {
       const { data: members, error: memberError } = await supabase
         .from('members')
         .select('id, email, default_password_hash, password_changed, auth_user_id')
-        .ilike('member_number', memberId); // Changed from eq to ilike for case-insensitive comparison
+        .ilike('member_number', memberId)
+        .limit(1); // Add limit to ensure we only get one result
 
       console.log("Member lookup response:", { members, memberError });
 
@@ -35,52 +36,54 @@ export const useLoginHandlers = (setIsLoggedIn: (value: boolean) => void) => {
       const tempEmail = `${memberId.toLowerCase()}@temp.pwaburton.org`;
       console.log("Attempting login with:", tempEmail);
       
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email: tempEmail,
-        password: password,
-      });
+      try {
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({
+          email: tempEmail,
+          password: password,
+        });
 
-      if (signInError) {
-        console.error('Sign in error:', signInError);
-        if (signInError.message.includes('Invalid login credentials')) {
-          throw new Error("Invalid Member ID or password. Please try again.");
+        if (signInError) {
+          console.error('Sign in error:', signInError);
+          throw signInError;
         }
-        throw signInError;
-      }
 
-      console.log("Sign in successful:", { userId: data.user?.id });
+        console.log("Sign in successful:", { userId: data.user?.id });
 
-      // Update auth_user_id if not set
-      if (!member.auth_user_id && data.user) {
-        console.log("Updating member with auth user ID:", data.user.id);
-        const { error: updateError } = await supabase
-          .from('members')
-          .update({ 
-            auth_user_id: data.user.id,
-            email_verified: true,
-            profile_updated: true
-          })
-          .eq('id', member.id);
+        // Update auth_user_id if not set
+        if (!member.auth_user_id && data.user) {
+          console.log("Updating member with auth user ID:", data.user.id);
+          const { error: updateError } = await supabase
+            .from('members')
+            .update({ 
+              auth_user_id: data.user.id,
+              email_verified: true,
+              profile_updated: true
+            })
+            .eq('id', member.id);
 
-        if (updateError) {
-          console.error('Error updating auth_user_id:', updateError);
+          if (updateError) {
+            console.error('Error updating auth_user_id:', updateError);
+          }
         }
-      }
 
-      // Check if password needs to be changed
-      if (!member.password_changed) {
-        console.log("Password change required, redirecting...");
-        navigate("/change-password");
-        return;
-      }
+        // Check if password needs to be changed
+        if (!member.password_changed) {
+          console.log("Password change required, redirecting...");
+          navigate("/change-password");
+          return;
+        }
 
-      toast({
-        title: "Login successful",
-        description: "Welcome back!",
-      });
-      
-      setIsLoggedIn(true);
-      navigate("/admin/profile");
+        toast({
+          title: "Login successful",
+          description: "Welcome back!",
+        });
+        
+        setIsLoggedIn(true);
+        navigate("/admin/profile");
+      } catch (signInError) {
+        console.error('Sign in attempt failed:', signInError);
+        throw new Error("Invalid Member ID or password. Please try again.");
+      }
     } catch (error) {
       console.error("Member ID login error:", error);
       toast({
