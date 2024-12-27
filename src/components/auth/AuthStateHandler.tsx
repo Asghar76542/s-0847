@@ -17,16 +17,28 @@ export const useAuthStateHandler = (setIsLoggedIn: (value: boolean) => void) => 
         
         if (error) {
           console.error("Session check error:", error);
+          setIsLoggedIn(false);
+          navigate("/login");
           return;
         }
         
         if (session) {
-          console.log("Active session found, redirecting to admin");
+          console.log("Active session found");
           setIsLoggedIn(true);
-          navigate("/admin");
+          if (window.location.pathname === "/login") {
+            navigate("/admin");
+          }
+        } else {
+          console.log("No active session");
+          setIsLoggedIn(false);
+          if (window.location.pathname !== "/login" && window.location.pathname !== "/register") {
+            navigate("/login");
+          }
         }
       } catch (error) {
         console.error("Session check failed:", error);
+        setIsLoggedIn(false);
+        navigate("/login");
       }
     };
 
@@ -44,7 +56,6 @@ export const useAuthStateHandler = (setIsLoggedIn: (value: boolean) => void) => 
               title: "Signed in successfully",
               description: "Welcome back!",
             });
-            // Directly navigate to admin dashboard without checks
             navigate("/admin");
           }
           break;
@@ -52,14 +63,21 @@ export const useAuthStateHandler = (setIsLoggedIn: (value: boolean) => void) => 
         case "SIGNED_OUT":
           console.log("User signed out");
           setIsLoggedIn(false);
+          navigate("/login");
           break;
           
         case "TOKEN_REFRESHED":
           console.log("Token refreshed successfully");
+          if (session) {
+            setIsLoggedIn(true);
+          }
           break;
           
         case "USER_UPDATED":
           console.log("User data updated");
+          if (session) {
+            setIsLoggedIn(true);
+          }
           break;
       }
     });
