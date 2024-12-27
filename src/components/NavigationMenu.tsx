@@ -59,16 +59,8 @@ export function NavigationMenu() {
 
   const handleLogout = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error("Logout error:", error);
-        toast({
-          title: "Logout failed",
-          description: error.message,
-          variant: "destructive",
-        });
-        return;
-      }
+      // First clear any existing session
+      await supabase.auth.signOut();
       
       setIsLoggedIn(false);
       toast({
@@ -78,10 +70,13 @@ export function NavigationMenu() {
       navigate("/login");
     } catch (error) {
       console.error("Logout error:", error);
+      // Even if there's an error, we'll still redirect to login
+      // and clear the local state
+      setIsLoggedIn(false);
+      navigate("/login");
       toast({
-        title: "Logout failed",
-        description: "An unexpected error occurred",
-        variant: "destructive",
+        title: "Session ended",
+        description: "You have been logged out.",
       });
     }
   };

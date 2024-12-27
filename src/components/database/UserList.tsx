@@ -112,8 +112,11 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
 
       // Update user role to include collector role
       const user = users.find(u => u.id === selectedUserId);
-      const newRole = user?.role === 'admin' ? 'admin,collector' : 'collector';
-      await updateUserRole(selectedUserId, newRole, user?.role);
+      const currentRoles = user?.role ? user.role.split(',') as SingleRole[] : [];
+      const hasAdmin = currentRoles.includes('admin');
+      const updatedRole = hasAdmin ? 'admin,collector' as UserRole : 'collector' as SingleRole;
+      
+      await updateUserRole(selectedUserId, 'collector', user?.role);
 
       setSelectedUserId(null);
       setShowCollectorDialog(false);
