@@ -14,9 +14,9 @@ export default function Profile() {
   const [searchAmount, setSearchAmount] = useState("");
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [memberNumber, setMemberNumber] = useState<string | null>(null);
 
-  // Check authentication and get user email
+  // Check authentication and get member number
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -24,8 +24,14 @@ export default function Profile() {
         navigate("/login");
         return;
       }
-      console.log("Current session:", session);
-      setUserEmail(session.user.email);
+
+      // Get member number from email (format: TM00001@pwaburton.org)
+      const email = session.user.email;
+      if (email) {
+        const memberNumber = email.split('@')[0].toUpperCase();
+        console.log('Extracted member number:', memberNumber);
+        setMemberNumber(memberNumber);
+      }
     };
 
     checkAuth();
@@ -34,8 +40,11 @@ export default function Profile() {
       if (!session) {
         navigate("/login");
       } else {
-        console.log("Auth state changed:", event, session);
-        setUserEmail(session.user.email);
+        const email = session.user.email;
+        if (email) {
+          const memberNumber = email.split('@')[0].toUpperCase();
+          setMemberNumber(memberNumber);
+        }
       }
     });
 
@@ -44,60 +53,41 @@ export default function Profile() {
     };
   }, [navigate]);
 
-  // Fetch member profile data
+  // Fetch member profile data using member number
   const { data: memberData, isLoading: memberLoading } = useQuery({
-    queryKey: ['member-profile', userEmail],
-    enabled: !!userEmail,
+    queryKey: ['member-profile', memberNumber],
+    enabled: !!memberNumber,
     queryFn: async () => {
-      console.log('Fetching profile for email:', userEmail);
+      console.log('Fetching profile for member number:', memberNumber);
       
-      try {
-        const { data, error } = await supabase
-          .from('members')
-          .select(`
-            *,
-            family_members (
-              id,
-              name,
-              relationship,
-              date_of_birth,
-              gender
-            )
-          `)
-          .eq('email', userEmail)
-          .maybeSingle();
+      const { data, error } = await supabase
+        .from('members')
+        .select('*, family_members(*)')
+        .eq('member_number', memberNumber)
+        .maybeSingle();
 
-        if (error) {
-          console.error('Error fetching profile:', error);
-          toast({
-            title: "Error fetching profile",
-            description: error.message,
-            variant: "destructive",
-          });
-          return null;
-        }
-
-        if (!data) {
-          console.log('No profile found for email:', userEmail);
-          toast({
-            title: "Profile not found",
-            description: "No member profile found for this email address.",
-            variant: "destructive",
-          });
-          return null;
-        }
-
-        console.log('Found profile:', data);
-        return data;
-      } catch (error) {
-        console.error('Error in profile fetch:', error);
+      if (error) {
+        console.error('Error fetching profile:', error);
         toast({
-          title: "Error",
-          description: "An unexpected error occurred while fetching your profile.",
+          title: "Error fetching profile",
+          description: error.message,
           variant: "destructive",
         });
         return null;
       }
+
+      if (!data) {
+        console.log('No profile found for member number:', memberNumber);
+        toast({
+          title: "Profile not found",
+          description: "No member profile found for this member number.",
+          variant: "destructive",
+        });
+        return null;
+      }
+
+      console.log('Found profile:', data);
+      return data;
     },
   });
 
