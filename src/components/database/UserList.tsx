@@ -24,10 +24,10 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
       console.log('Updating user role:', { userId, newRole, currentRole });
       
       // If user already has the role, remove it (toggle behavior)
-      const roles = currentRole ? currentRole.split(',') : [];
+      const roles = currentRole ? currentRole.split(',') as UserRole[] : [];
       let updatedRoles: string[];
       
-      if (roles.includes(newRole)) {
+      if (roles.includes(newRole as UserRole)) {
         // Remove the role
         updatedRoles = roles.filter(r => r !== newRole);
       } else {
@@ -36,7 +36,7 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
       }
       
       // Convert back to string or null if empty
-      const updatedRole = updatedRoles.length > 0 ? updatedRoles.join(',') as UserRole : null;
+      const updatedRole = updatedRoles.length > 0 ? updatedRoles.join(',') as UserRole : 'member' as UserRole;
       
       const { error } = await supabase
         .from('profiles')
@@ -148,7 +148,7 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
   return (
     <div className="space-y-4">
       {users.map((user) => {
-        const roles = user.role ? user.role.split(',') : [];
+        const roles = user.role ? user.role.split(',') as UserRole[] : [];
         const isAdmin = roles.includes('admin');
         const isCollector = roles.includes('collector');
 
