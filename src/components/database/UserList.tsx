@@ -4,7 +4,7 @@ import { UserCheck, Shield } from "lucide-react";
 import { useState } from "react";
 import { RoleButton } from "./RoleButton";
 import { CollectorDialog } from "./CollectorDialog";
-import { UserRole } from "@/types/roles";
+import { UserRole, SingleRole } from "@/types/roles";
 
 interface UserListProps {
   users: any[];
@@ -18,16 +18,16 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [showCollectorDialog, setShowCollectorDialog] = useState(false);
 
-  const updateUserRole = async (userId: string, newRole: string, currentRole: UserRole | null) => {
+  const updateUserRole = async (userId: string, newRole: SingleRole, currentRole: UserRole | null) => {
     setUpdating(userId);
     try {
       console.log('Updating user role:', { userId, newRole, currentRole });
       
       // If user already has the role, remove it (toggle behavior)
-      const roles = currentRole ? currentRole.split(',') as UserRole[] : [];
-      let updatedRoles: string[];
+      const roles = currentRole ? currentRole.split(',') as SingleRole[] : [];
+      let updatedRoles: SingleRole[];
       
-      if (roles.includes(newRole as UserRole)) {
+      if (roles.includes(newRole)) {
         // Remove the role
         updatedRoles = roles.filter(r => r !== newRole);
       } else {
@@ -35,8 +35,8 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
         updatedRoles = [...roles, newRole];
       }
       
-      // Convert back to string or null if empty
-      const updatedRole = updatedRoles.length > 0 ? updatedRoles.join(',') as UserRole : 'member' as UserRole;
+      // Convert back to string or set to 'member' if empty
+      const updatedRole = updatedRoles.length > 0 ? updatedRoles.join(',') as UserRole : 'member';
       
       const { error } = await supabase
         .from('profiles')
@@ -49,7 +49,7 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
       if (error) throw error;
 
       toast({
-        title: updatedRole ? "Role updated" : "Role removed",
+        title: "Role updated",
         description: `User roles have been successfully updated.`,
       });
       onUpdate();
@@ -148,7 +148,7 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
   return (
     <div className="space-y-4">
       {users.map((user) => {
-        const roles = user.role ? user.role.split(',') as UserRole[] : [];
+        const roles = user.role ? user.role.split(',') as SingleRole[] : [];
         const isAdmin = roles.includes('admin');
         const isCollector = roles.includes('collector');
 
