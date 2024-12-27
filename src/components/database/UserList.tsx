@@ -3,6 +3,9 @@ import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { UserCheck, Shield } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useState } from "react";
+import { Input } from "@/components/ui/input";
 
 interface UserListProps {
   users: any[];
@@ -13,6 +16,11 @@ interface UserListProps {
 
 export function UserList({ users, onUpdate, updating, setUpdating }: UserListProps) {
   const { toast } = useToast();
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [collectorName, setCollectorName] = useState("");
+  const [existingCollectors, setExistingCollectors] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedCollectorId, setSelectedCollectorId] = useState<string>("");
+  const [isNewCollector, setIsNewCollector] = useState(true);
 
   const updateUserRole = async (userId: string, newRole: "member" | "collector" | "admin") => {
     setUpdating(userId);
@@ -50,8 +58,93 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
     await updateUserRole(userId, "admin");
   };
 
-  const makeCollector = async (userId: string) => {
-    await updateUserRole(userId, "collector");
+  const fetchCollectors = async () => {
+    const { data, error } = await supabase
+      .from('collectors')
+      .select('id, name')
+      .order('name');
+    
+    if (error) {
+      console.error('Error fetching collectors:', error);
+      return;
+    }
+    
+    setExistingCollectors(data || []);
+  };
+
+  const handleMakeCollector = async (userId: string) => {
+    setSelectedUserId(userId);
+    await fetchCollectors();
+    setCollectorName("");
+    setSelectedCollectorId("");
+    setIsNewCollector(true);
+  };
+
+  const handleCollectorCreation = async () => {
+    if (!selectedUserId) return;
+
+    try {
+      setUpdating(selectedUserId);
+
+      if (isNewCollector) {
+        if (!collectorName.trim()) {
+          toast({
+            title: "Error",
+            description: "Please enter a collector name",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Generate prefix from collector name
+        const prefix = collectorName
+          .split(/\s+/)
+          .map(word => word.charAt(0).toUpperCase())
+          .join('');
+
+        // Get the next available number
+        const { data: existingCollectors } = await supabase
+          .from('collectors')
+          .select('number')
+          .ilike('prefix', prefix);
+
+        const nextNumber = String(
+          Math.max(0, ...existingCollectors?.map(c => parseInt(c.number)) || [0]) + 1
+        ).padStart(2, '0');
+
+        // Create new collector
+        const { error: createError } = await supabase
+          .from('collectors')
+          .insert({
+            name: collectorName,
+            prefix,
+            number: nextNumber,
+            active: true
+          });
+
+        if (createError) throw createError;
+      }
+
+      // Update user role
+      await updateUserRole(selectedUserId, "collector");
+
+      setSelectedUserId(null);
+      toast({
+        title: "Success",
+        description: isNewCollector 
+          ? "New collector created and role updated" 
+          : "User role updated to collector",
+      });
+    } catch (error) {
+      console.error('Error creating collector:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create collector",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdating(null);
+    }
   };
 
   return (
@@ -73,16 +166,73 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => makeCollector(user.id)}
-              disabled={updating === user.id || user.role === 'collector'}
-              className={user.role === 'collector' ? 'bg-blue-100' : ''}
-            >
-              <UserCheck className="h-4 w-4 mr-1" />
-              Collector
-            </Button>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleMakeCollector(user.id)}
+                  disabled={updating === user.id || user.role === 'collector'}
+                  className={user.role === 'collector' ? 'bg-blue-100' : ''}
+                >
+                  <UserCheck className="h-4 w-4 mr-1" />
+                  Collector
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Make User a Collector</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-4">
+                  <div className="flex items-center space-x-4">
+                    <Button
+                      variant={isNewCollector ? "default" : "outline"}
+                      onClick={() => setIsNewCollector(true)}
+                    >
+                      Create New
+                    </Button>
+                    <Button
+                      variant={!isNewCollector ? "default" : "outline"}
+                      onClick={() => setIsNewCollector(false)}
+                    >
+                      Select Existing
+                    </Button>
+                  </div>
+
+                  {isNewCollector ? (
+                    <Input
+                      placeholder="Enter collector name"
+                      value={collectorName}
+                      onChange={(e) => setCollectorName(e.target.value)}
+                    />
+                  ) : (
+                    <Select
+                      value={selectedCollectorId}
+                      onValueChange={setSelectedCollectorId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a collector" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {existingCollectors.map((collector) => (
+                          <SelectItem key={collector.id} value={collector.id}>
+                            {collector.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  <Button 
+                    onClick={handleCollectorCreation}
+                    disabled={isNewCollector ? !collectorName : !selectedCollectorId}
+                  >
+                    Confirm
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
             <Button
               variant="outline"
               size="sm"
