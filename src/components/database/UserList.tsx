@@ -4,6 +4,7 @@ import { UserCheck, Shield } from "lucide-react";
 import { useState } from "react";
 import { RoleButton } from "./RoleButton";
 import { CollectorDialog } from "./CollectorDialog";
+import { UserRole } from "@/types/roles";
 
 interface UserListProps {
   users: any[];
@@ -17,13 +18,25 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [showCollectorDialog, setShowCollectorDialog] = useState(false);
 
-  const updateUserRole = async (userId: string, newRole: string, currentRole: string | null) => {
+  const updateUserRole = async (userId: string, newRole: string, currentRole: UserRole | null) => {
     setUpdating(userId);
     try {
       console.log('Updating user role:', { userId, newRole, currentRole });
       
       // If user already has the role, remove it (toggle behavior)
-      const updatedRole = currentRole === newRole ? null : newRole;
+      const roles = currentRole ? currentRole.split(',') : [];
+      let updatedRoles: string[];
+      
+      if (roles.includes(newRole)) {
+        // Remove the role
+        updatedRoles = roles.filter(r => r !== newRole);
+      } else {
+        // Add the role
+        updatedRoles = [...roles, newRole];
+      }
+      
+      // Convert back to string or null if empty
+      const updatedRole = updatedRoles.length > 0 ? updatedRoles.join(',') as UserRole : null;
       
       const { error } = await supabase
         .from('profiles')
@@ -36,8 +49,8 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
       if (error) throw error;
 
       toast({
-        title: updatedRole ? "Role added" : "Role removed",
-        description: `User role has been successfully ${updatedRole ? 'updated' : 'removed'}.`,
+        title: updatedRole ? "Role updated" : "Role removed",
+        description: `User roles have been successfully updated.`,
       });
       onUpdate();
     } catch (error) {
@@ -128,10 +141,8 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
     setShowCollectorDialog(true);
   };
 
-  const handleMakeAdmin = async (userId: string, currentRole: string | null) => {
-    // If user is already a collector, add admin role while keeping collector role
-    const newRole = currentRole === 'collector' ? 'admin,collector' : 'admin';
-    await updateUserRole(userId, newRole, currentRole);
+  const handleMakeAdmin = async (userId: string, currentRole: UserRole | null) => {
+    await updateUserRole(userId, 'admin', currentRole);
   };
 
   return (
