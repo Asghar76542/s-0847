@@ -18,30 +18,30 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [showCollectorDialog, setShowCollectorDialog] = useState(false);
 
-  const updateUserRole = async (userId: string, newRole: SingleRole, currentRole: UserRole | null) => {
+  const updateUserRole = async (userId: string, roleToToggle: SingleRole, currentRole: UserRole | null) => {
     setUpdating(userId);
     try {
-      console.log('Updating user role:', { userId, newRole, currentRole });
+      console.log('Updating user role:', { userId, roleToToggle, currentRole });
       
       // If user already has the role, remove it (toggle behavior)
       const roles = currentRole ? currentRole.split(',') as SingleRole[] : [];
       let updatedRoles: SingleRole[];
       
-      if (roles.includes(newRole)) {
+      if (roles.includes(roleToToggle)) {
         // Remove the role
-        updatedRoles = roles.filter(r => r !== newRole);
+        updatedRoles = roles.filter(r => r !== roleToToggle);
       } else {
         // Add the role
-        updatedRoles = [...roles, newRole];
+        updatedRoles = [...roles, roleToToggle];
       }
       
       // Convert back to string or set to 'member' if empty
-      const updatedRole = updatedRoles.length > 0 ? updatedRoles.join(',') as UserRole : 'member';
+      const finalRole = updatedRoles.length > 0 ? updatedRoles.join(',') as UserRole : 'member' as SingleRole;
       
       const { error } = await supabase
         .from('profiles')
         .update({ 
-          role: updatedRole,
+          role: finalRole,
           updated_at: new Date().toISOString()
         })
         .eq('id', userId);
@@ -112,10 +112,6 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
 
       // Update user role to include collector role
       const user = users.find(u => u.id === selectedUserId);
-      const currentRoles = user?.role ? user.role.split(',') as SingleRole[] : [];
-      const hasAdmin = currentRoles.includes('admin');
-      const updatedRole = hasAdmin ? 'admin,collector' as UserRole : 'collector' as SingleRole;
-      
       await updateUserRole(selectedUserId, 'collector', user?.role);
 
       setSelectedUserId(null);
