@@ -10,8 +10,8 @@ export async function handleMemberIdLogin(memberId: string, password: string, na
     throw new Error("Member ID not found");
   }
   
-  // Use member number for email
-  const email = `${member.member_number.toLowerCase()}@pwaburton.org`;
+  // Use the email stored in the database
+  const email = member.email || `${member.member_number.toLowerCase()}@temp.pwaburton.org`;
   
   console.log("Attempting member ID login with:", { memberId, email });
   
