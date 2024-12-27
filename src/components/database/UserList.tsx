@@ -23,20 +23,8 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
     try {
       console.log('Updating user role:', { userId, roleToToggle, currentRole });
       
-      // If user already has the role, remove it (toggle behavior)
-      const roles = currentRole ? currentRole.split(',') as SingleRole[] : [];
-      let updatedRoles: SingleRole[];
-      
-      if (roles.includes(roleToToggle)) {
-        // Remove the role
-        updatedRoles = roles.filter(r => r !== roleToToggle);
-      } else {
-        // Add the role
-        updatedRoles = [...roles, roleToToggle];
-      }
-      
-      // Convert back to string or set to 'member' if empty
-      const finalRole = updatedRoles.length > 0 ? updatedRoles.join(',') as UserRole : 'member' as SingleRole;
+      // Set the new role directly
+      const finalRole = roleToToggle as SingleRole;
       
       const { error } = await supabase
         .from('profiles')
@@ -50,7 +38,7 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
 
       toast({
         title: "Role updated",
-        description: `User roles have been successfully updated.`,
+        description: `User role has been successfully updated.`,
       });
       onUpdate();
     } catch (error) {
@@ -110,7 +98,7 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
         if (createError) throw createError;
       }
 
-      // Update user role to include collector role
+      // Update user role to collector
       const user = users.find(u => u.id === selectedUserId);
       await updateUserRole(selectedUserId, 'collector', user?.role);
 
@@ -147,9 +135,8 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
   return (
     <div className="space-y-4">
       {users.map((user) => {
-        const roles = user.role ? user.role.split(',') as SingleRole[] : [];
-        const isAdmin = roles.includes('admin');
-        const isCollector = roles.includes('collector');
+        const isAdmin = user.role === 'admin';
+        const isCollector = user.role === 'collector';
 
         return (
           <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
@@ -159,7 +146,7 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
                 Email: {user.email}
               </p>
               <p className="text-sm text-muted-foreground">
-                Roles: {roles.join(', ') || 'None'}
+                Role: {user.role || 'None'}
               </p>
               <p className="text-sm text-muted-foreground">
                 Created: {new Date(user.created_at).toLocaleDateString()}
