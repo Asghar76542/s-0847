@@ -10,22 +10,25 @@ import { Button } from "./ui/button";
 import { useEffect, useState } from "react";
 import { supabase } from "../integrations/supabase/client";
 import { useToast } from "./ui/use-toast";
+import { UserRole } from "@/types/roles";
 
+// Define menu items with role restrictions
 const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", to: "/admin" },
-  { icon: Users, label: "Members", to: "/admin/members" },
-  { icon: UserCheck, label: "Collectors", to: "/admin/collectors" },
-  { icon: ClipboardList, label: "Registrations", to: "/admin/registrations" },
-  { icon: Database, label: "Database", to: "/admin/database" },
-  { icon: DollarSign, label: "Finance", to: "/admin/finance" },
-  { icon: HeadsetIcon, label: "Support Tickets", to: "/admin/support" },
-  { icon: UserCircle, label: "Profile", to: "/admin/profile" },
+  { icon: LayoutDashboard, label: "Dashboard", to: "/admin", roles: ["admin"] },
+  { icon: Users, label: "Members", to: "/admin/members", roles: ["admin"] },
+  { icon: UserCheck, label: "Collectors", to: "/admin/collectors", roles: ["admin"] },
+  { icon: ClipboardList, label: "Registrations", to: "/admin/registrations", roles: ["admin"] },
+  { icon: Database, label: "Database", to: "/admin/database", roles: ["admin"] },
+  { icon: DollarSign, label: "Finance", to: "/admin/finance", roles: ["admin", "collector"] },
+  { icon: HeadsetIcon, label: "Support Tickets", to: "/admin/support", roles: ["admin"] },
+  { icon: UserCircle, label: "Profile", to: "/admin/profile", roles: ["admin", "collector", "member"] },
 ];
 
 export function AdminLayout() {
   const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -47,27 +50,37 @@ export function AdminLayout() {
           return;
         }
 
-        // Verify the user still exists
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        
-        if (userError || !user) {
-          console.error("User verification error:", userError);
-          try {
-            // Try to sign out, but don't wait for it
-            supabase.auth.signOut().catch(e => console.error("Sign out error:", e));
-          } finally {
-            setIsLoggedIn(false);
-            navigate("/login");
-            toast({
-              title: "Session expired",
-              description: "Please log in again",
-              variant: "destructive",
-            });
-          }
+        // Get user role from profiles table
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profileError) {
+          console.error("Profile fetch error:", profileError);
+          setIsLoggedIn(false);
+          navigate("/login");
           return;
         }
 
+        setUserRole(profile.role);
         setIsLoggedIn(true);
+
+        // Check if current route is allowed for user's role
+        const currentPath = window.location.pathname;
+        const allowedPaths = menuItems.filter(item => item.roles.includes(profile.role)).map(item => item.to);
+        
+        if (!allowedPaths.includes(currentPath) && currentPath !== "/admin/profile") {
+          console.log("Access denied to path:", currentPath);
+          navigate("/admin/profile");
+          toast({
+            title: "Access Restricted",
+            description: "You don't have permission to access this page",
+            variant: "destructive",
+          });
+        }
+
       } catch (error) {
         console.error("Auth check error:", error);
         setIsLoggedIn(false);
@@ -84,26 +97,8 @@ export function AdminLayout() {
       
       if (event === "SIGNED_OUT") {
         setIsLoggedIn(false);
+        setUserRole(null);
         navigate("/login");
-      } else if (event === "SIGNED_IN" && session) {
-        setIsLoggedIn(true);
-      } else if (event === "TOKEN_REFRESHED") {
-        // Verify the refreshed session is still valid
-        const { data: { user }, error } = await supabase.auth.getUser();
-        if (error || !user) {
-          try {
-            // Try to sign out, but don't wait for it
-            supabase.auth.signOut().catch(e => console.error("Sign out error:", e));
-          } finally {
-            setIsLoggedIn(false);
-            navigate("/login");
-            toast({
-              title: "Session expired",
-              description: "Please log in again",
-              variant: "destructive",
-            });
-          }
-        }
       }
     });
 
@@ -121,6 +116,9 @@ export function AdminLayout() {
     return null;
   }
 
+  // Filter menu items based on user role
+  const allowedMenuItems = menuItems.filter(item => userRole && item.roles.includes(userRole));
+
   return (
     <div className="min-h-screen flex flex-col w-full bg-background">
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -136,7 +134,7 @@ export function AdminLayout() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-[calc(100vw-2rem)] max-w-[calc(1400px-4rem)]">
-              {menuItems.map((item) => (
+              {allowedMenuItems.map((item) => (
                 <DropdownMenuItem
                   key={item.to}
                   onClick={() => navigate(item.to)}
