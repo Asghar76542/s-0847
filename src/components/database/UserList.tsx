@@ -1,11 +1,9 @@
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
 import { UserCheck, Shield } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useState } from "react";
-import { Input } from "@/components/ui/input";
+import { RoleButton } from "./RoleButton";
+import { CollectorDialog } from "./CollectorDialog";
 
 interface UserListProps {
   users: any[];
@@ -17,20 +15,20 @@ interface UserListProps {
 export function UserList({ users, onUpdate, updating, setUpdating }: UserListProps) {
   const { toast } = useToast();
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [collectorName, setCollectorName] = useState("");
-  const [existingCollectors, setExistingCollectors] = useState<Array<{ id: string; name: string }>>([]);
-  const [selectedCollectorId, setSelectedCollectorId] = useState<string>("");
-  const [isNewCollector, setIsNewCollector] = useState(true);
+  const [showCollectorDialog, setShowCollectorDialog] = useState(false);
 
-  const updateUserRole = async (userId: string, newRole: "member" | "collector" | "admin") => {
+  const updateUserRole = async (userId: string, newRole: string, currentRole: string | null) => {
     setUpdating(userId);
     try {
-      console.log('Updating user role:', { userId, newRole });
+      console.log('Updating user role:', { userId, newRole, currentRole });
+      
+      // If user already has the role, remove it (toggle behavior)
+      const updatedRole = currentRole === newRole ? null : newRole;
       
       const { error } = await supabase
         .from('profiles')
         .update({ 
-          role: newRole,
+          role: updatedRole,
           updated_at: new Date().toISOString()
         })
         .eq('id', userId);
@@ -38,8 +36,8 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
       if (error) throw error;
 
       toast({
-        title: "Role updated",
-        description: "User role has been successfully updated.",
+        title: updatedRole ? "Role added" : "Role removed",
+        description: `User role has been successfully ${updatedRole ? 'updated' : 'removed'}.`,
       });
       onUpdate();
     } catch (error) {
@@ -54,39 +52,13 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
     }
   };
 
-  const makeAdmin = async (userId: string) => {
-    await updateUserRole(userId, "admin");
-  };
-
-  const fetchCollectors = async () => {
-    const { data, error } = await supabase
-      .from('collectors')
-      .select('id, name')
-      .order('name');
-    
-    if (error) {
-      console.error('Error fetching collectors:', error);
-      return;
-    }
-    
-    setExistingCollectors(data || []);
-  };
-
-  const handleMakeCollector = async (userId: string) => {
-    setSelectedUserId(userId);
-    await fetchCollectors();
-    setCollectorName("");
-    setSelectedCollectorId("");
-    setIsNewCollector(true);
-  };
-
-  const handleCollectorCreation = async () => {
+  const handleCollectorCreation = async (isNew: boolean, collectorName: string, collectorId: string) => {
     if (!selectedUserId) return;
 
     try {
       setUpdating(selectedUserId);
 
-      if (isNewCollector) {
+      if (isNew) {
         if (!collectorName.trim()) {
           toast({
             title: "Error",
@@ -125,13 +97,17 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
         if (createError) throw createError;
       }
 
-      // Update user role
-      await updateUserRole(selectedUserId, "collector");
+      // Update user role to include collector role
+      const user = users.find(u => u.id === selectedUserId);
+      const newRole = user?.role === 'admin' ? 'admin,collector' : 'collector';
+      await updateUserRole(selectedUserId, newRole, user?.role);
 
       setSelectedUserId(null);
+      setShowCollectorDialog(false);
+      
       toast({
         title: "Success",
-        description: isNewCollector 
+        description: isNew 
           ? "New collector created and role updated" 
           : "User role updated to collector",
       });
@@ -147,119 +123,64 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
     }
   };
 
+  const handleMakeCollector = (userId: string) => {
+    setSelectedUserId(userId);
+    setShowCollectorDialog(true);
+  };
+
+  const handleMakeAdmin = async (userId: string, currentRole: string | null) => {
+    // If user is already a collector, add admin role while keeping collector role
+    const newRole = currentRole === 'collector' ? 'admin,collector' : 'admin';
+    await updateUserRole(userId, newRole, currentRole);
+  };
+
   return (
     <div className="space-y-4">
-      {users.map((user) => (
-        <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
-          <div className="space-y-1">
-            <p className="font-medium">{user.member_number || 'No Member Number'}</p>
-            <p className="text-sm text-muted-foreground">
-              Email: {user.email}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Last login: {user.last_sign_in_at 
-                ? new Date(user.last_sign_in_at).toLocaleString() 
-                : 'Never logged in'}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Created: {new Date(user.created_at).toLocaleDateString()}
-            </p>
+      {users.map((user) => {
+        const roles = user.role ? user.role.split(',') : [];
+        const isAdmin = roles.includes('admin');
+        const isCollector = roles.includes('collector');
+
+        return (
+          <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
+            <div className="space-y-1">
+              <p className="font-medium">{user.member_number || 'No Member Number'}</p>
+              <p className="text-sm text-muted-foreground">
+                Email: {user.email}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Roles: {roles.join(', ') || 'None'}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Created: {new Date(user.created_at).toLocaleDateString()}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <RoleButton
+                onClick={() => handleMakeCollector(user.id)}
+                disabled={updating === user.id}
+                isActive={isCollector}
+                icon={UserCheck}
+                label="Collector"
+              />
+              <RoleButton
+                onClick={() => handleMakeAdmin(user.id, user.role)}
+                disabled={updating === user.id}
+                isActive={isAdmin}
+                icon={Shield}
+                label="Admin"
+              />
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleMakeCollector(user.id)}
-                  disabled={updating === user.id || user.role === 'collector'}
-                  className={user.role === 'collector' ? 'bg-blue-100' : ''}
-                >
-                  <UserCheck className="h-4 w-4 mr-1" />
-                  Collector
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Make User a Collector</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 pt-4">
-                  <div className="flex items-center space-x-4">
-                    <Button
-                      variant={isNewCollector ? "default" : "outline"}
-                      onClick={() => setIsNewCollector(true)}
-                    >
-                      Create New
-                    </Button>
-                    <Button
-                      variant={!isNewCollector ? "default" : "outline"}
-                      onClick={() => setIsNewCollector(false)}
-                    >
-                      Select Existing
-                    </Button>
-                  </div>
+        );
+      })}
 
-                  {isNewCollector ? (
-                    <Input
-                      placeholder="Enter collector name"
-                      value={collectorName}
-                      onChange={(e) => setCollectorName(e.target.value)}
-                    />
-                  ) : (
-                    <Select
-                      value={selectedCollectorId}
-                      onValueChange={setSelectedCollectorId}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a collector" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {existingCollectors.map((collector) => (
-                          <SelectItem key={collector.id} value={collector.id}>
-                            {collector.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-
-                  <Button 
-                    onClick={handleCollectorCreation}
-                    disabled={isNewCollector ? !collectorName : !selectedCollectorId}
-                  >
-                    Confirm
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => makeAdmin(user.id)}
-              disabled={updating === user.id || user.role === 'admin'}
-              className={user.role === 'admin' ? 'bg-red-100' : ''}
-            >
-              <Shield className="h-4 w-4 mr-1" />
-              Admin
-            </Button>
-            <Select
-              value={user.role || 'member'}
-              onValueChange={(value: "member" | "collector" | "admin") => updateUserRole(user.id, value)}
-              disabled={updating === user.id}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Select role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="member">Member</SelectItem>
-                <SelectItem value="collector">Collector</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      ))}
+      <CollectorDialog
+        isOpen={showCollectorDialog}
+        onClose={() => setShowCollectorDialog(false)}
+        onConfirm={handleCollectorCreation}
+        isLoading={!!updating}
+      />
     </div>
   );
 }
