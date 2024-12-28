@@ -14,8 +14,8 @@ import { UserRole } from "@/types/roles";
 
 // Define menu items with role restrictions
 const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", to: "/admin", roles: ["admin"] },
-  { icon: Users, label: "Members", to: "/admin/members", roles: ["admin", "collector"] },
+  { icon: LayoutDashboard, label: "Dashboard", to: "/admin", roles: ["admin", "collector"] }, // Added collector
+  { icon: Users, label: "Members", to: "/admin/members", roles: ["admin", "collector"] }, // Added collector
   { icon: UserCheck, label: "Collectors", to: "/admin/collectors", roles: ["admin"] },
   { icon: ClipboardList, label: "Registrations", to: "/admin/registrations", roles: ["admin"] },
   { icon: Database, label: "Database", to: "/admin/database", roles: ["admin"] },
