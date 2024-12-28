@@ -34,13 +34,17 @@ export const useMembers = (page: number, searchTerm: string) => {
         // Get the user's profile to check their role
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('*')
+          .select('id, role, email')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
         if (profileError) {
           console.error('Error fetching profile:', profileError);
           throw profileError;
+        }
+
+        if (!profile) {
+          throw new Error('No profile found for user');
         }
 
         // Initialize the query
@@ -52,26 +56,28 @@ export const useMembers = (page: number, searchTerm: string) => {
         if (profile.role === 'collector') {
           console.log('Filtering members for collector role');
           
-          // Get collector details based on member_number prefix
+          // First get the collector details based on email
           const { data: collector, error: collectorError } = await supabase
             .from('collectors')
-            .select('id, prefix, number')
-            .eq('id', profile.collector_id)
-            .single();
+            .select('id')
+            .eq('email', profile.email)
+            .maybeSingle();
 
           if (collectorError) {
             console.error('Error fetching collector:', collectorError);
             throw collectorError;
           }
 
-          if (collector) {
-            query = query.eq('collector_id', collector.id);
-            console.log('Filtering by collector:', {
-              collector_id: collector.id,
-              prefix: collector.prefix,
-              number: collector.number
-            });
+          if (!collector) {
+            console.log('No collector found for email:', profile.email);
+            return {
+              members: [],
+              totalCount: 0
+            };
           }
+
+          console.log('Found collector:', collector);
+          query = query.eq('collector_id', collector.id);
         }
 
         // Apply search filter if searchTerm exists
