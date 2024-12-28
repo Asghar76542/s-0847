@@ -31,41 +31,37 @@ export const useMembers = (page: number, searchTerm: string) => {
 
         console.log('Current user:', user.id);
 
-        // Check if profile exists
-        const { data: existingProfile, error: profileError } = await supabase
+        // Get the user's profile to check their role and email
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .single();
 
-        if (profileError && profileError.code !== 'PGRST116') {
-          console.error('Error checking profile:', profileError);
+        if (profileError) {
+          console.error('Error fetching profile:', profileError);
           throw profileError;
         }
 
-        // If no profile exists, create one
-        if (!existingProfile) {
-          console.log('Creating new profile for user');
-          const { error: insertError } = await supabase
-            .from('profiles')
-            .insert({
-              id: user.id,
-              email: user.email,
-              role: 'admin', // Default role for testing
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            });
-
-          if (insertError) {
-            console.error('Error creating profile:', insertError);
-            throw insertError;
-          }
-        }
-
-        // Now fetch members
+        // Initialize the query
         let query = supabase
           .from('members')
           .select('*', { count: 'exact' });
+
+        // If user is a collector, only show their assigned members
+        if (profile.role === 'collector') {
+          console.log('Filtering members for collector with email:', profile.email);
+          const { data: collector } = await supabase
+            .from('collectors')
+            .select('id')
+            .eq('email', profile.email)
+            .single();
+
+          if (collector) {
+            query = query.eq('collector_id', collector.id);
+            console.log('Filtering by collector_id:', collector.id);
+          }
+        }
 
         // Apply search filter if searchTerm exists
         if (searchTerm) {
