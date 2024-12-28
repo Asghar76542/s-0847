@@ -31,7 +31,7 @@ export const useMembers = (page: number, searchTerm: string) => {
 
         console.log('Current user:', user.id);
 
-        // Get the user's profile to check their role and email
+        // Get the user's profile to check their role
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('*')
@@ -50,16 +50,27 @@ export const useMembers = (page: number, searchTerm: string) => {
 
         // If user is a collector, only show their assigned members
         if (profile.role === 'collector') {
-          console.log('Filtering members for collector with email:', profile.email);
-          const { data: collector } = await supabase
+          console.log('Filtering members for collector role');
+          
+          // Get collector details based on member_number prefix
+          const { data: collector, error: collectorError } = await supabase
             .from('collectors')
-            .select('id')
-            .eq('email', profile.email)
+            .select('id, prefix, number')
+            .eq('id', profile.collector_id)
             .single();
+
+          if (collectorError) {
+            console.error('Error fetching collector:', collectorError);
+            throw collectorError;
+          }
 
           if (collector) {
             query = query.eq('collector_id', collector.id);
-            console.log('Filtering by collector_id:', collector.id);
+            console.log('Filtering by collector:', {
+              collector_id: collector.id,
+              prefix: collector.prefix,
+              number: collector.number
+            });
           }
         }
 
@@ -100,7 +111,7 @@ export const useMembers = (page: number, searchTerm: string) => {
       errorMessage: "Failed to load members"
     },
     retry: 1,
-    staleTime: 30000, // Cache data for 30 seconds
-    refetchOnWindowFocus: false // Prevent unnecessary refetches
+    staleTime: 30000,
+    refetchOnWindowFocus: false
   });
 };
