@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Member } from "@/components/members/types";
-import { useToast } from "@/hooks/use-toast";
 
 interface MembersData {
   members: Member[];
@@ -9,8 +8,6 @@ interface MembersData {
 }
 
 export const useMembers = (page: number, searchTerm: string) => {
-  const { toast } = useToast();
-
   return useQuery({
     queryKey: ['members', page, searchTerm],
     queryFn: async (): Promise<MembersData> => {
@@ -47,16 +44,16 @@ export const useMembers = (page: number, searchTerm: string) => {
           throw new Error('No profile found for user');
         }
 
-        // Initialize the query
+        // Initialize the query with a count
         let query = supabase
           .from('members')
-          .select('*', { count: 'exact' });
+          .select('*, collectors!inner(id, name, prefix, number)', { count: 'exact' });
 
-        // If user is a collector, only show their assigned members
+        // If user is a collector, filter by their collector id
         if (profile.role === 'collector') {
           console.log('Filtering members for collector role');
           
-          // First get the collector details based on email
+          // Get collector details based on email
           const { data: collector, error: collectorError } = await supabase
             .from('collectors')
             .select('id')
@@ -89,35 +86,29 @@ export const useMembers = (page: number, searchTerm: string) => {
         const from = page * 20;
         const to = from + 19;
         
-        const { data: members, error: queryError, count } = await query
+        // Execute the query
+        const { data: members, error: membersError, count } = await query
           .range(from, to)
           .order('created_at', { ascending: false });
-        
-        if (queryError) {
-          console.error('Error fetching members:', queryError);
-          throw queryError;
+
+        if (membersError) {
+          console.error('Error fetching members:', membersError);
+          throw membersError;
         }
-        
-        console.log('Query completed. Members found:', members?.length);
-        console.log('Total count:', count);
-        
+
+        console.log(`Found ${count} total members, returning ${members?.length} for current page`);
+
         return {
-          members: members?.map(member => ({
-            ...member,
-            name: member.full_name
-          })) || [],
+          members: members || [],
           totalCount: count || 0
         };
       } catch (error) {
-        console.error('Error in useMembers:', error);
+        console.error('Error in useMembers hook:', error);
         throw error;
       }
     },
     meta: {
       errorMessage: "Failed to load members"
-    },
-    retry: 1,
-    staleTime: 30000,
-    refetchOnWindowFocus: false
+    }
   });
 };
