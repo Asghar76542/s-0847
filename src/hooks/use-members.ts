@@ -44,10 +44,18 @@ export const useMembers = (page: number, searchTerm: string) => {
           throw new Error('No profile found for user');
         }
 
-        // Initialize the query with a count
+        // Initialize query with collectors join
         let query = supabase
           .from('members')
-          .select('*, collectors!inner(id, name, prefix, number)', { count: 'exact' });
+          .select(`
+            *,
+            collectors (
+              id,
+              name,
+              prefix,
+              number
+            )
+          `, { count: 'exact' });
 
         // If user is a collector, filter by their collector id
         if (profile.role === 'collector') {
@@ -97,6 +105,7 @@ export const useMembers = (page: number, searchTerm: string) => {
         }
 
         console.log(`Found ${count} total members, returning ${members?.length} for current page`);
+        console.log('Members data:', members);
 
         return {
           members: members || [],
