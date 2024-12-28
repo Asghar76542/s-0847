@@ -3,72 +3,102 @@ import { supabase } from "@/integrations/supabase/client";
 import { getMemberByMemberId } from "@/utils/memberAuth";
 
 export async function handleMemberIdLogin(memberId: string, password: string, navigate: ReturnType<typeof useNavigate>) {
-  // First, look up the member
-  const member = await getMemberByMemberId(memberId);
-  
-  if (!member) {
-    throw new Error("Member ID not found");
-  }
-  
-  // Use the email stored in the database
-  const email = member.email || `${member.member_number.toLowerCase()}@temp.pwaburton.org`;
-  
-  console.log("Attempting member ID login with:", { memberId, email });
-  
   try {
-    // Try to sign in
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (signInError) {
-      console.error('Sign in error:', signInError);
+    // First, look up the member
+    const member = await getMemberByMemberId(memberId);
+    
+    if (!member) {
+      throw new Error("Member ID not found");
+    }
+    
+    // Use the email stored in the database
+    const email = member.email;
+    
+    console.log("Attempting member ID login with:", { memberId, email });
+    
+    // For first time login, always use member number as password
+    if (!member.password_changed) {
+      console.log("First time login detected, using member number as password");
       
-      // If it's the first login attempt, try with default password
-      if (signInError.message.includes("Invalid login credentials") && !member.password_changed) {
-        console.log("First login attempt, trying with default password");
-        const { data: defaultSignInData, error: defaultSignInError } = await supabase.auth.signInWithPassword({
+      // Try to sign in first with member number as password
+      let { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: member.member_number
+      });
+
+      if (signInError) {
+        console.log('Initial sign in failed, attempting signup:', signInError);
+        
+        // Only attempt signup if user doesn't exist
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email,
-          password: member.member_number, // Use member number as default password
+          password: member.member_number,
+          options: {
+            data: {
+              member_id: member.id,
+              member_number: member.member_number,
+              full_name: member.full_name
+            }
+          }
         });
 
-        if (!defaultSignInError && defaultSignInData?.user) {
-          navigate("/admin");
-          return;
+        if (signUpError) {
+          console.error('Sign up error:', signUpError);
+          throw new Error("Failed to create account");
         }
-      }
-      
-      throw new Error("Invalid member ID or password");
-    }
 
-    if (signInData?.user) {
-      navigate("/admin");
-      return;
-    }
+        // If signup succeeded, try signing in again
+        const { data: finalSignInData, error: finalSignInError } = await supabase.auth.signInWithPassword({
+          email,
+          password: member.member_number
+        });
 
-    // If sign in fails, create account with provided password
-    console.log("Sign in failed, attempting to create account");
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password: member.member_number, // Use member number as initial password
-      options: {
-        data: {
-          member_id: member.id,
-          member_number: member.member_number,
-          full_name: member.full_name
+        if (finalSignInError) {
+          console.error('Final sign in error:', finalSignInError);
+          throw new Error("Failed to sign in after account creation");
         }
+
+        signInData = finalSignInData;
       }
-    });
 
-    if (signUpError) {
-      console.error('Sign up error:', signUpError);
-      throw signUpError;
+      if (signInData?.user) {
+        // Update member record to link it with auth user
+        const { error: updateError } = await supabase
+          .from('members')
+          .update({ 
+            auth_user_id: signInData.user.id,
+            email_verified: true 
+          })
+          .eq('id', member.id)
+          .single();
+
+        if (updateError) {
+          console.error('Error updating member:', updateError);
+          throw new Error("Failed to link account");
+        }
+
+        navigate("/admin");
+        return;
+      }
+    } else {
+      // Regular login with provided password
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (signInError) {
+        console.error('Sign in error:', signInError);
+        throw new Error("Invalid member ID or password");
+      }
+
+      if (signInData?.user) {
+        navigate("/admin");
+        return;
+      }
     }
 
-    if (signUpData?.user) {
-      navigate("/admin");
-    }
+    throw new Error("Login failed");
   } catch (error) {
     console.error('Authentication error:', error);
     throw error;
